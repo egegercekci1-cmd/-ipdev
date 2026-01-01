@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ders & Ödev Takip</title>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg,#43cea2,#185a9d);
+  color:white;
+}
+
+header {
+  text-align:center;
+  padding:15px;
+  font-size:22px;
+  font-weight:bold;
+}
+
+nav {
+  display:flex;
+  justify-content:space-around;
+  background:rgba(0,0,0,0.2);
+  padding:10px;
+}
+
+nav button {
+  background:#fff;
+  color:#333;
+  border:none;
+  padding:10px;
+  border-radius:20px;
+  font-weight:bold;
+}
+
+section {
+  padding:15px;
+  display:none;
+}
+
+section.active {
+  display:block;
+}
+
+.card {
+  background:white;
+  color:#333;
+  border-radius:15px;
+  padding:10px;
+  margin-bottom:10px;
+}
+
+.card.urgent {
+  border:2px solid red;
+}
+
+input, textarea, select {
+  width:100%;
+  padding:8px;
+  margin-top:5px;
+  border-radius:10px;
+  border:1px solid #ccc;
+}
+
+button.action {
+  background:#185a9d;
+  color:white;
+  border:none;
+  padding:10px;
+  width:100%;
+  border-radius:20px;
+  margin-top:10px;
+  font-weight:bold;
+}
+
+.done {
+  text-decoration: line-through;
+  opacity:0.6;
+}
+</style>
+</head>
+
+<body>
+
+<header>📚 Ders & Ödev Takip</header>
+
+<nav>
+  <button onclick="show('program')">📅 Program</button>
+  <button onclick="show('odev')">📝 Ödevler</button>
+  <button onclick="show('ekle')">➕ Ekle</button>
+</nav>
+
+<!-- HAFTALIK DERS PROGRAMI -->
+<section id="program" class="active">
+  <h3>Haftalık Ders Programı</h3>
+
+  <label>Gün</label>
+  <select id="gun">
+    <option>Pazartesi</option>
+    <option>Salı</option>
+    <option>Çarşamba</option>
+    <option>Perşembe</option>
+    <option>Cuma</option>
+  </select>
+
+  <label>Ders Adı</label>
+  <input id="programDers">
+
+  <button class="action" onclick="dersEkle()">Derse Ekle</button>
+
+  <div id="programList"></div>
+</section>
+
+<!-- ÖDEVLER -->
+<section id="odev">
+  <h3>Ödevler</h3>
+  <div id="odevList"></div>
+</section>
+
+<!-- ÖDEV EKLE -->
+<section id="ekle">
+  <h3>Ödev Ekle</h3>
+
+  <label>Ders</label>
+  <input id="ders">
+
+  <label>Açıklama</label>
+  <textarea id="aciklama"></textarea>
+
+  <label>Teslim Tarihi</label>
+  <input type="date" id="tarih">
+
+  <button class="action" onclick="odevEkle()">Kaydet</button>
+</section>
+
+<script>
+let odevler = JSON.parse(localStorage.getItem("odevler")) || [];
+let program = JSON.parse(localStorage.getItem("program")) || {};
+
+function show(id){
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  listele();
+  programListele();
+}
+
+function odevEkle(){
+  const ders = dersInput.value;
+  const aciklama = aciklamaInput.value;
+  const tarih = tarihInput.value;
+  if(!ders || !tarih) return alert("Boş bırakma");
+
+  odevler.push({ders,aciklama,tarih,done:false});
+  localStorage.setItem("odevler",JSON.stringify(odevler));
+  show("odev");
+}
+
+function listele(){
+  odevList.innerHTML="";
+  const today = new Date();
+
+  odevler.forEach((o,i)=>{
+    const due = new Date(o.tarih);
+    const diff = (due - today) / (1000*60*60*24);
+
+    const d=document.createElement("div");
+    d.className="card"+(diff<=1 && !o.done ? " urgent":"")+(o.done?" done":"");
+    d.innerHTML=`
+      <b>${o.ders}</b><br>
+      ${o.aciklama}<br>
+      📅 ${o.tarih}<br><br>
+      <button onclick="tamam(${i})">✅</button>
+      <button onclick="sil(${i})">🗑️</button>
+    `;
+    odevList.appendChild(d);
+  });
+}
+
+function tamam(i){
+  odevler[i].done=true;
+  localStorage.setItem("odevler",JSON.stringify(odevler));
+  listele();
+}
+
+function sil(i){
+  odevler.splice(i,1);
+  localStorage.setItem("odevler",JSON.stringify(odevler));
+  listele();
+}
+
+/* DERS PROGRAMI */
+function dersEkle(){
+  const gun = document.getElementById("gun").value;
+  const ders = document.getElementById("programDers").value;
+  if(!ders) return;
+
+  if(!program[gun]) program[gun]=[];
+  program[gun].push(ders);
+
+  localStorage.setItem("program",JSON.stringify(program));
+  programListele();
+}
+
+function programListele(){
+  programList.innerHTML="";
+  for(let g in program){
+    const d=document.createElement("div");
+    d.className="card";
+    d.innerHTML=`<b>${g}</b><br>`+program[g].join(" • ");
+    programList.appendChild(d);
+  }
+}
+
+const dersInput = document.getElementById("ders");
+const aciklamaInput = document.getElementById("aciklama");
+const tarihInput = document.getElementById("tarih");
+
+listele();
+programListele();
+</script>
+
+</body>
+</html>
