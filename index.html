@@ -130,8 +130,8 @@ button.action:hover {
   <h2 style="text-align:center; color:#185a9d; margin-top:0;">Ders & Ödev Takip</h2>
   
   <div id="step1">
-    <label>E-Posta Adresin</label>
-    <input type="email" id="email" placeholder="ornek@okul.com">
+    <label>E-Posta Adresin (Gmail vb.)</label>
+    <input type="email" id="email" placeholder="ornek@gmail.com">
 
     <label>Giriş Rolü (İlk Kayıtta Belirlenir)</label>
     <select id="rol">
@@ -164,8 +164,8 @@ button.action:hover {
     <div id="ogretmenPanel" class="card hidden">
       <h3 style="color:#185a9d; margin-top:0;">👨‍🏫 Öğrenciye Ödev Gönder</h3>
       
-      <label>Öğrencinin E-Postası</label>
-      <input type="email" id="hedefOgrenci" placeholder="ogrenci@okul.com">
+      <label>Öğrencinin E-Postası (Gmail vb.)</label>
+      <input type="email" id="hedefOgrenci" placeholder="ogrenci@gmail.com">
       
       <label>Ders Adı</label>
       <input type="text" id="ovDers" placeholder="Örn: Matematik">
@@ -211,20 +211,20 @@ button.action:hover {
   let geciciRol = "";
 
   function epostaGecerliMi(email) {
+    // Gmail, Hotmail, Outlook dahil tüm standart e-posta formatlarını destekler
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   }
 
   function kodGonder() {
-    const email = document.getElementById("email").value.trim();
+    const email = document.getElementById("email").value.trim().toLowerCase();
     const rol = document.getElementById("rol").value;
 
     if(!email) return alert("Lütfen e-posta adresini gir!");
-    if(!epostaGecerliMi(email)) return alert("Geçersiz e-posta formatı!");
+    if(!epostaGecerliMi(email)) return alert("Geçersiz e-posta formatı! Lütfen geçerli bir e-posta (örn: gmail.com) girin.");
 
     const emailKey = email.replace(/\./g, '_').replace(/[@]/g, '_');
 
-    // Daha önce bu hesap açılmış mı kontrol et (Rol kilidi için)
     db.ref('kullanicilar/' + emailKey).once('value', (snapshot) => {
       const kayitliKullanici = snapshot.val();
 
@@ -232,12 +232,10 @@ button.action:hover {
         return alert(`Bu hesap daha önce "${kayitliKullanici.rol.toUpperCase()}" olarak kaydedilmiş! Rolü değiştiremezsiniz.`);
       }
 
-      // 4 haneli rastgele kod üret
       uretilenKod = Math.floor(1000 + Math.random() * 9000).toString();
       geciciEmail = email;
       geciciRol = rol;
 
-      // Simülasyon mail bildirimi
       alert(`[SİMÜLASYON MAİLİ] Doğrulama Kodunuz: ${uretilenKod}`);
 
       document.getElementById("step1").classList.add("hidden");
@@ -254,7 +252,6 @@ button.action:hover {
 
     const emailKey = geciciEmail.replace(/\./g, '_').replace(/[@]/g, '_');
 
-    // Rolü veritabanına sabitle
     db.ref('kullanicilar/' + emailKey).set({
       email: geciciEmail,
       rol: geciciRol
@@ -303,7 +300,7 @@ button.action:hover {
   }
 
   function odevAta() {
-    const hedefEmail = document.getElementById("hedefOgrenci").value.trim();
+    const hedefEmail = document.getElementById("hedefOgrenci").value.trim().toLowerCase();
     const ders = document.getElementById("ovDers").value.trim();
     const aciklama = document.getElementById("ovAciklama").value.trim();
     const tarih = document.getElementById("ovTarih").value;
@@ -357,7 +354,6 @@ button.action:hover {
 
   function ogretmenTakipGetir() {
     const takipDiv = document.getElementById("ogretmenTakipListesi");
-    // Tüm öğrencilerin ödevlerini çekip bu öğretmenin verdiklerini filtreleyeceğiz
     db.ref('odevler').on('value', (snapshot) => {
       const tumVeriler = snapshot.val();
       if(!tumVeriler) {
@@ -374,7 +370,6 @@ button.action:hover {
           const o = ogrenciOdevleri[odevId];
           if(o.ogretmen === currentUser.email) {
             toplamOdevSayisi++;
-            const ogrenciGercekEmail = ogrenciKey.replace(/_/g, '.').replace('__', '@'); // Basit okuma
             takipDiv.innerHTML += `
               <div style="background:#f8f9fa; padding:10px; border-radius:10px; margin-bottom:8px; border-left:4px solid ${o.tamamlandi ? '#2ed573' : '#ff4757'}; color:#333;">
                 <b style="color:#185a9d;">Öğrenci:</b> ${ogrenciKey.replaceAll('_','.')}<br>
