@@ -3,223 +3,257 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ders & Ödev Takip</title>
+<title>Ders & Ödev Takip - Portal</title>
+
+<!-- Firebase SDK'leri -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
 <style>
 body {
-  margin:0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg,#43cea2,#185a9d);
-  color:white;
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #43cea2, #185a9d);
+  color: white;
+  min-height: 100vh;
 }
-
 header {
-  text-align:center;
-  padding:15px;
-  font-size:22px;
-  font-weight:bold;
+  text-align: center;
+  padding: 20px;
+  font-size: 24px;
+  font-weight: bold;
 }
-
-nav {
-  display:flex;
-  justify-content:space-around;
-  background:rgba(0,0,0,0.2);
-  padding:10px;
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
 }
-
-nav button {
-  background:#fff;
-  color:#333;
-  border:none;
-  padding:10px;
-  border-radius:20px;
-  font-weight:bold;
-}
-
-section {
-  padding:15px;
-  display:none;
-}
-
-section.active {
-  display:block;
-}
-
 .card {
-  background:white;
-  color:#333;
-  border-radius:15px;
-  padding:10px;
-  margin-bottom:10px;
+  background: white;
+  color: #333;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
-
-.card.urgent {
-  border:2px solid red;
-}
-
 input, textarea, select {
-  width:100%;
-  padding:8px;
-  margin-top:5px;
-  border-radius:10px;
-  border:1px solid #ccc;
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
 }
-
 button.action {
-  background:#185a9d;
-  color:white;
-  border:none;
-  padding:10px;
-  width:100%;
-  border-radius:20px;
-  margin-top:10px;
-  font-weight:bold;
+  background: #185a9d;
+  color: white;
+  border: none;
+  padding: 12px;
+  width: 100%;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
 }
-
-.done {
-  text-decoration: line-through;
-  opacity:0.6;
+button.action:hover {
+  background: #14467c;
+}
+.auth-box {
+  background: white;
+  color: #333;
+  padding: 30px;
+  border-radius: 20px;
+  max-width: 400px;
+  margin: 50px auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.hidden {
+  display: none !important;
+}
+.badge {
+  background: #ff4757;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
 }
 </style>
 </head>
 
 <body>
 
-<header>📚 Ders & Ödev Takip</header>
+<!-- GİRİŞ / KAYIT EKRANI -->
+<div id="authScreen" class="auth-box">
+  <h2 style="text-align:center; color:#185a9d;">Giriş Yap / Kayıt Ol</h2>
+  
+  <label>E-Posta</label>
+  <input type="email" id="email" placeholder="ornek@okul.com">
 
-<nav>
-  <button onclick="show('program')">📅 Program</button>
-  <button onclick="show('odev')">📝 Ödevler</button>
-  <button onclick="show('ekle')">➕ Ekle</button>
-</nav>
+  <label>Şifre</label>
+  <input type="password" id="sifre" placeholder="******">
 
-<!-- HAFTALIK DERS PROGRAMI -->
-<section id="program" class="active">
-  <h3>Haftalık Ders Programı</h3>
+  <div id="registerFields" class="hidden">
+    <label>Hesap Türü</label>
+    <select id="rol">
+      <option value="ogrenci">Öğrenci</option>
+      <option value="ogretmen">Öğretmen</option>
+    </select>
+  </div>
 
-  <label>Gün</label>
-  <select id="gun">
-    <option>Pazartesi</option>
-    <option>Salı</option>
-    <option>Çarşamba</option>
-    <option>Perşembe</option>
-    <option>Cuma</option>
-  </select>
+  <button class="action" onclick="girisYap()">Giriş Yap</button>
+  <button class="action" style="background:#2ed573; margin-top:10px;" onclick="kayitOlModalToggle()">Kayıt Ol / Mod Değiştir</button>
+</div>
 
-  <label>Ders Adı</label>
-  <input id="programDers">
+<!-- ANA UYGULAMA EKRANI -->
+<div id="appScreen" class="hidden">
+  <header>
+    📚 Ders & Ödev Takip 
+    <span id="userRoleBadge" class="badge"></span>
+    <button onclick="cikisYap()" style="float:right; background:#ff4757; color:white; border:none; padding:5px 10px; border-radius:10px; cursor:pointer;">Çıkış</button>
+  </header>
 
-  <button class="action" onclick="dersEkle()">Derse Ekle</button>
+  <div class="container">
+    <!-- ÖĞRETMEN PANELİ: ÖDEV ATAMA -->
+    <div id="ogretmenPanel" class="card hidden">
+      <h3>👨‍🏫 Öğrenciye Ödev Ata</h3>
+      <label>Öğrenci E-Posta</label>
+      <input type="text" id="hedefOgrenci" placeholder="ogrenci@okul.com">
+      
+      <label>Ders</label>
+      <input type="text" id="ovDers" placeholder="Matematik">
 
-  <div id="programList"></div>
-</section>
+      <label>Ödev Açıklaması</label>
+      <textarea id="ovAciklama" placeholder="Test 4 çözülecek"></textarea>
 
-<!-- ÖDEVLER -->
-<section id="odev">
-  <h3>Ödevler</h3>
-  <div id="odevList"></div>
-</section>
+      <label>Teslim Tarihi</label>
+      <input type="date" id="ovTarih">
 
-<!-- ÖDEV EKLE -->
-<section id="ekle">
-  <h3>Ödev Ekle</h3>
+      <button class="action" onclick="odevAta()">Ödevi Gönder</button>
+    </div>
 
-  <label>Ders</label>
-  <input id="ders">
-
-  <label>Açıklama</label>
-  <textarea id="aciklama"></textarea>
-
-  <label>Teslim Tarihi</label>
-  <input type="date" id="tarih">
-
-  <button class="action" onclick="odevEkle()">Kaydet</button>
-</section>
+    <!-- ÖĞRENCİ PANELİ: BANA GELEN ÖDEVLER -->
+    <div id="ogrenciPanel" class="card">
+      <h3>📝 Bana Atanan Ödevler</h3>
+      <div id="ogrenciOdevListesi">
+        <p style="color:#666;">Yükleniyor...</p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-let odevler = JSON.parse(localStorage.getItem("odevler")) || [];
-let program = JSON.parse(localStorage.getItem("program")) || {};
+  // 🔥 BURAYA KENDİ FIREBASE BİLGİLERİNİ EKLEDİK:
+  const firebaseConfig = {
+    databaseURL: "https://ders-takip-e395b-default-rtdb.firebaseio.com"
+  };
 
-function show(id){
-  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  listele();
-  programListele();
-}
+  // Firebase'i Başlat
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-function odevEkle(){
-  const ders = dersInput.value;
-  const aciklama = aciklamaInput.value;
-  const tarih = tarihInput.value;
-  if(!ders || !tarih) return alert("Boş bırakma");
+  let currentUser = JSON.parse(localStorage.getItem("currentUser")) || null;
 
-  odevler.push({ders,aciklama,tarih,done:false});
-  localStorage.setItem("odevler",JSON.stringify(odevler));
-  show("odev");
-}
-
-function listele(){
-  odevList.innerHTML="";
-  const today = new Date();
-
-  odevler.forEach((o,i)=>{
-    const due = new Date(o.tarih);
-    const diff = (due - today) / (1000*60*60*24);
-
-    const d=document.createElement("div");
-    d.className="card"+(diff<=1 && !o.done ? " urgent":"")+(o.done?" done":"");
-    d.innerHTML=`
-      <b>${o.ders}</b><br>
-      ${o.aciklama}<br>
-      📅 ${o.tarih}<br><br>
-      <button onclick="tamam(${i})">✅</button>
-      <button onclick="sil(${i})">🗑️</button>
-    `;
-    odevList.appendChild(d);
-  });
-}
-
-function tamam(i){
-  odevler[i].done=true;
-  localStorage.setItem("odevler",JSON.stringify(odevler));
-  listele();
-}
-
-function sil(i){
-  odevler.splice(i,1);
-  localStorage.setItem("odevler",JSON.stringify(odevler));
-  listele();
-}
-
-/* DERS PROGRAMI */
-function dersEkle(){
-  const gun = document.getElementById("gun").value;
-  const ders = document.getElementById("programDers").value;
-  if(!ders) return;
-
-  if(!program[gun]) program[gun]=[];
-  program[gun].push(ders);
-
-  localStorage.setItem("program",JSON.stringify(program));
-  programListele();
-}
-
-function programListele(){
-  programList.innerHTML="";
-  for(let g in program){
-    const d=document.createElement("div");
-    d.className="card";
-    d.innerHTML=`<b>${g}</b><br>`+program[g].join(" • ");
-    programList.appendChild(d);
+  function kayitOlModalToggle() {
+    document.getElementById("registerFields").classList.toggle("hidden");
   }
-}
 
-const dersInput = document.getElementById("ders");
-const aciklamaInput = document.getElementById("aciklama");
-const tarihInput = document.getElementById("tarih");
+  function girisYap() {
+    const email = document.getElementById("email").value.trim();
+    const sifre = document.getElementById("sifre").value;
+    const registerAçıkmi = !document.getElementById("registerFields").classList.contains("hidden");
 
-listele();
-programListele();
+    if(!email || !sifre) return alert("Lütfen alanları doldurun!");
+
+    let rol = "ogrenci";
+    if(registerAçıkmi) {
+      rol = document.getElementById("rol").value;
+    } else {
+      if(email.includes("ogretmen")) rol = "ogretmen";
+    }
+
+    currentUser = { email: email.replace(/\./g, '_'), orijinalEmail: email, rol };
+    localStorage.setItem("currentUser", JSON.stringify(currentUser));
+    ekranKontrol();
+  }
+
+  function cikisYap() {
+    localStorage.removeItem("currentUser");
+    currentUser = null;
+    ekranKontrol();
+  }
+
+  function ekranKontrol() {
+    if(currentUser) {
+      document.getElementById("authScreen").classList.add("hidden");
+      document.getElementById("appScreen").classList.remove("hidden");
+      document.getElementById("userRoleBadgeinnerText" || "userRoleBadge").innerText = currentUser.rol.toUpperCase();
+
+      if(currentUser.rol === "ogretmen") {
+        document.getElementById("ogretmenPanel").classList.remove("hidden");
+        document.getElementById("ogrenciPanel").classList.add("hidden");
+      } else {
+        document.getElementById("ogretmenPanel").classList.add("hidden");
+        document.getElementById("ogrenciPanel").classList.remove("hidden");
+        ogrenciOdevleriniGetir();
+      }
+    } else {
+      document.getElementById("authScreen").classList.remove("hidden");
+      document.getElementById("appScreen").classList.add("hidden");
+    }
+  }
+
+  function odevAta() {
+    const hedef = document.getElementById("hedefOgrenci").value.trim().replace(/\./g, '_');
+    const ders = document.getElementById("ovDers").value.trim();
+    const aciklama = document.getElementById("ovAciklama").value.trim();
+    const tarih = document.getElementById("ovTarih").value;
+
+    if(!hedef || !ders || !tarih) return alert("Eksik alan bırakmayın!");
+
+    // Realtime Database'e gönder
+    db.ref('odevler/' + hedef).push({
+      ders,
+      aciklama,
+      tarih,
+      atananOgretmen: currentUser.orijinalEmail
+    });
+
+    alert("Ödev başarıyla öğrenciye atandı!");
+    
+    document.getElementById("hedefOgrenci").value = "";
+    document.getElementById("ovDers").value = "";
+    document.getElementById("ovAciklama").value = "";
+    document.getElementById("ovTarih").value = "";
+  }
+
+  function ogrenciOdevleriniGetir() {
+    const listeDiv = document.getElementById("ogrenciOdevListesi");
+    const ogrenciKey = currentUser.email;
+
+    // Realtime Database'den anlık olarak dinle
+    db.ref('odevler/' + ogrenciKey).on('value', (snapshot) => {
+      const data = snapshot.val();
+      
+      if(!data) {
+        listeDiv.innerHTML = `<p style="color:#666;">Size atanmış yeni bir ödev bulunmuyor.</p>`;
+        return;
+      }
+
+      listeDiv.innerHTML = "";
+      Object.values(data).forEach(o => {
+        listeDiv.innerHTML += `
+          <div style="background:#f9f9f9; padding:12px; border-radius:10px; margin-bottom:10px; border-left:4px solid #185a9d; color:#333;">
+            <b>📚 ${o.ders}</b> <span style="font-size:12px; color:#666;">(Öğretmen: ${o.atananOgretmen})</span><br>
+            <p style="margin: 5px 0;">${o.aciklama}</p>
+            <small>📅 Teslim: ${o.tarih}</small>
+          </div>
+        `;
+      });
+    });
+  }
+
+  ekranKontrol();
 </script>
 
 </body>
