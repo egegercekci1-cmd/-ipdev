@@ -129,6 +129,7 @@ button.action:hover {
 <div id="authScreen" class="auth-box">
   <h2 style="text-align:center; color:#185a9d; margin-top:0;">Ders & Ödev Takip</h2>
   
+  <!-- 1. ADIM: E-POSTA VE ROL -->
   <div id="step1">
     <label>E-Posta Adresin (Gmail vb.)</label>
     <input type="email" id="email" placeholder="ornek@gmail.com">
@@ -142,12 +143,18 @@ button.action:hover {
     <button class="action" onclick="kodGonder()">Doğrulama Kodu Gönder</button>
   </div>
 
+  <!-- 2. ADIM: KOD GİRİŞ EKRANI (Başlangıçta Gizli) -->
   <div id="step2" class="hidden">
-    <p style="color:#565656; font-size:13px; text-align:center;">E-posta adresinize gönderilen 4 haneli doğrulama kodunu girin:</p>
-    <label>Doğrulama Kodu</label>
-    <input type="text" id="girilenKod" placeholder="Örn: 1234" maxlength="4">
+    <div style="background:#e8f4fd; padding:12px; border-radius:10px; margin-bottom:15px; border-left:4px solid #185a9d;">
+      <p style="margin:0; font-size:13px; color:#185a9d; font-weight:bold;">📧 Doğrulama Kodu Gönderildi!</p>
+      <p id="kodBilgi" style="margin:5px 0 0 0; font-size:14px; color:#333;"></p>
+    </div>
+
+    <label>4 Haneli Doğrulama Kodu</label>
+    <input type="text" id="girilenKod" placeholder="Örn: 4829" maxlength="4">
 
     <button class="action" onclick="kodAtaVeGirisYap()">Kodu Onayla ve Giriş Yap</button>
+    <button class="action" style="background:#6c757d; margin-top:8px;" onclick="geriDon()">Geri Dön / E-Posta Değiştir</button>
   </div>
 </div>
 
@@ -211,7 +218,6 @@ button.action:hover {
   let geciciRol = "";
 
   function epostaGecerliMi(email) {
-    // Gmail, Hotmail, Outlook dahil tüm standart e-posta formatlarını destekler
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   }
@@ -232,20 +238,30 @@ button.action:hover {
         return alert(`Bu hesap daha önce "${kayitliKullanici.rol.toUpperCase()}" olarak kaydedilmiş! Rolü değiştiremezsiniz.`);
       }
 
+      // 4 haneli kod üret
       uretilenKod = Math.floor(1000 + Math.random() * 9000).toString();
       geciciEmail = email;
       geciciRol = rol;
 
-      alert(`[SİMÜLASYON MAİLİ] Doğrulama Kodunuz: ${uretilenKod}`);
+      // Kod ekranda net görünsün diye hem uyarı çıkıyor hem kutucuğa yazılıyor
+      document.getElementById("kodBilgi").innerHTML = `<b>${email}</b> adresine kod gönderildi.<br>Simülasyon Kodunuz: <span style="color:#ff4757; font-size:16px;">${uretilenKod}</span>`;
 
+      // Ekran geçişi
       document.getElementById("step1").classList.add("hidden");
       document.getElementById("step2").classList.remove("hidden");
     });
   }
 
+  function geriDon() {
+    document.getElementById("step2").classList.add("hidden");
+    document.getElementById("step1").classList.remove("hidden");
+    document.getElementById("girilenKod").value = "";
+  }
+
   function kodAtaVeGirisYap() {
     const girilen = document.getElementById("girilenKod").value.trim();
 
+    if(!girilen) return alert("Lütfen doğrulama kodunu girin!");
     if(girilen !== uretilenKod) {
       return alert("Hatalı doğrulama kodu! Lütfen tekrar deneyin.");
     }
@@ -264,6 +280,8 @@ button.action:hover {
     };
     
     localStorage.setItem("currentUser", JSON.stringify(currentUser));
+    
+    // Alanları temizle ve sıfırla
     document.getElementById("step2").classList.add("hidden");
     document.getElementById("step1").classList.remove("hidden");
     document.getElementById("girilenKod").value = "";
@@ -296,6 +314,8 @@ button.action:hover {
     } else {
       document.getElementById("authScreen").classList.remove("hidden");
       document.getElementById("appScreen").classList.add("hidden");
+      document.getElementById("step1").classList.remove("hidden");
+      document.getElementById("step2").classList.add("hidden");
     }
   }
 
