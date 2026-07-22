@@ -18,13 +18,6 @@ body {
   min-height: 100vh;
 }
 
-header {
-  text-align: center;
-  padding: 20px;
-  font-size: 22px;
-  font-weight: bold;
-}
-
 .container {
   max-width: 600px;
   margin: 0 auto;
@@ -129,33 +122,16 @@ button.action:hover {
 <div id="authScreen" class="auth-box">
   <h2 style="text-align:center; color:#185a9d; margin-top:0;">Ders & Ödev Takip</h2>
   
-  <!-- 1. ADIM: E-POSTA VE ROL -->
-  <div id="step1">
-    <label>E-Posta Adresin (Gmail vb.)</label>
-    <input type="email" id="email" placeholder="ornek@gmail.com">
+  <label>E-Posta Adresin (Gmail vb.)</label>
+  <input type="email" id="email" placeholder="ornek@gmail.com">
 
-    <label>Giriş Rolü (İlk Kayıtta Belirlenir)</label>
-    <select id="rol">
-      <option value="ogrenci">Öğrenciyim</option>
-      <option value="ogretmen">Öğretmenim</option>
-    </select>
+  <label>Giriş Rolü (İlk Kayıtta Belirlenir)</label>
+  <select id="rol">
+    <option value="ogrenci">Öğrenciyim</option>
+    <option value="ogretmen">Öğretmenim</option>
+  </select>
 
-    <button class="action" onclick="kodGonder()">Doğrulama Kodu Gönder</button>
-  </div>
-
-  <!-- 2. ADIM: KOD GİRİŞ EKRANI (Başlangıçta Gizli) -->
-  <div id="step2" class="hidden">
-    <div style="background:#e8f4fd; padding:12px; border-radius:10px; margin-bottom:15px; border-left:4px solid #185a9d;">
-      <p style="margin:0; font-size:13px; color:#185a9d; font-weight:bold;">📧 Doğrulama Kodu Gönderildi!</p>
-      <p id="kodBilgi" style="margin:5px 0 0 0; font-size:14px; color:#333;"></p>
-    </div>
-
-    <label>4 Haneli Doğrulama Kodu</label>
-    <input type="text" id="girilenKod" placeholder="Örn: 4829" maxlength="4">
-
-    <button class="action" onclick="kodAtaVeGirisYap()">Kodu Onayla ve Giriş Yap</button>
-    <button class="action" style="background:#6c757d; margin-top:8px;" onclick="geriDon()">Geri Dön / E-Posta Değiştir</button>
-  </div>
+  <button class="action" onclick="girisYap()">Sisteme Giriş Yap</button>
 </div>
 
 <!-- ANA UYGULAMA EKRANI -->
@@ -213,16 +189,19 @@ button.action:hover {
   const db = firebase.database();
 
   let currentUser = JSON.parse(localStorage.getItem("currentUser")) || null;
-  let uretilenKod = "";
-  let geciciEmail = "";
-  let geciciRol = "";
+  // Bu cihaz için benzersiz oturum ID'si üretilir
+  let currentDeviceId = localStorage.getItem("deviceId");
+  if(!currentDeviceId) {
+    currentDeviceId = 'dev_' + Math.random().toString(36.substring(2)) + Date.now();
+    localStorage.setItem("deviceId", currentDeviceId);
+  }
 
   function epostaGecerliMi(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   }
 
-  function kodGonder() {
+  function girisYap() {
     const email = document.getElementById("email").value.trim().toLowerCase();
     const rol = document.getElementById("rol").value;
 
@@ -234,66 +213,56 @@ button.action:hover {
     db.ref('kullanicilar/' + emailKey).once('value', (snapshot) => {
       const kayitliKullanici = snapshot.val();
 
+      // Rol kilidi kontrolü
       if(kayitliKullanici && kayitliKullanici.rol !== rol) {
-        return alert(`Bu hesap daha önce "${kayitliKullanici.rol.toUpperCase()}" olarak kaydedilmiş! Rolü değiştiremezsiniz.`);
+        return alert(`Bu e-posta adresi daha önce "${kayitliKullanici.rol.toUpperCase()}" olarak kaydedilmiş! Rolü değiştiremezsiniz.`);
       }
 
-      // 4 haneli kod üret
-      uretilenKod = Math.floor(1000 + Math.random() * 9000).toString();
-      geciciEmail = email;
-      geciciRol = rol;
+      // Cihaz bazlı oturum atama (Başka cihazda açıksa orayı düşürür)
+      db.ref('kullanicilar/' + emailKey).set({
+        email: email,
+        rol: rol,
+        aktifCihaz: currentDeviceId
+      });
 
-      // Kod ekranda net görünsün diye hem uyarı çıkıyor hem kutucuğa yazılıyor
-      document.getElementById("kodBilgi").innerHTML = `<b>${email}</b> adresine kod gönderildi.<br>Simülasyon Kodunuz: <span style="color:#ff4757; font-size:16px;">${uretilenKod}</span>`;
-
-      // Ekran geçişi
-      document.getElementById("step1").classList.add("hidden");
-      document.getElementById("step2").classList.remove("hidden");
+      currentUser = { 
+        emailClean: emailKey, 
+        email: email, 
+        rol: rol 
+      };
+      
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+      document.getElementById("email").value = "";
+      ekranKontrol();
+    }).catch(() => {
+      alert("Veritabanı bağlantı hatası oluştu.");
     });
-  }
-
-  function geriDon() {
-    document.getElementById("step2").classList.add("hidden");
-    document.getElementById("step1").classList.remove("hidden");
-    document.getElementById("girilenKod").value = "";
-  }
-
-  function kodAtaVeGirisYap() {
-    const girilen = document.getElementById("girilenKod").value.trim();
-
-    if(!girilen) return alert("Lütfen doğrulama kodunu girin!");
-    if(girilen !== uretilenKod) {
-      return alert("Hatalı doğrulama kodu! Lütfen tekrar deneyin.");
-    }
-
-    const emailKey = geciciEmail.replace(/\./g, '_').replace(/[@]/g, '_');
-
-    db.ref('kullanicilar/' + emailKey).set({
-      email: geciciEmail,
-      rol: geciciRol
-    });
-
-    currentUser = { 
-      emailClean: emailKey, 
-      email: geciciEmail, 
-      rol: geciciRol 
-    };
-    
-    localStorage.setItem("currentUser", JSON.stringify(currentUser));
-    
-    // Alanları temizle ve sıfırla
-    document.getElementById("step2").classList.add("hidden");
-    document.getElementById("step1").classList.remove("hidden");
-    document.getElementById("girilenKod").value = "";
-    document.getElementById("email").value = "";
-    
-    ekranKontrol();
   }
 
   function cikisYap() {
+    if(currentUser) {
+      // Çıkış yapıldığında veritabanındaki aktif cihaz bilgisini temizle
+      db.ref('kullanicilar/' + currentUser.emailClean + '/aktifCihaz').remove();
+    }
     localStorage.removeItem("currentUser");
     currentUser = null;
     ekranKontrol();
+  }
+
+  function oturumGuvenlikKontrolu() {
+    if(!currentUser) return;
+    
+    // Veritabanından bu kullanıcının aktif cihazını dinle
+    db.ref('kullanicilar/' + currentUser.emailClean + '/aktifCihaz').on('value', (snapshot) => {
+      const aktifCihaz = snapshot.val();
+      // Eğer veritabanındaki aktif cihaz bu cihazın ID'si ile uyuşmuyorsa, başka yerden giriş yapılmıştır
+      if(aktifCihaz && aktifCihaz !== currentDeviceId) {
+        alert("Bu hesap başka bir cihazdan açıldığı için bu oturum sonlandırıldı!");
+        localStorage.removeItem("currentUser");
+        currentUser = null;
+        ekranKontrol();
+      }
+    });
   }
 
   function ekranKontrol() {
@@ -301,6 +270,8 @@ button.action:hover {
       document.getElementById("authScreen").classList.add("hidden");
       document.getElementById("appScreen").classList.remove("hidden");
       document.getElementById("userRoleBadge").innerText = currentUser.rol === "ogretmen" ? "ÖĞRETMEN" : "ÖĞRENCİ";
+
+      oturumGuvenlikKontrolu();
 
       if(currentUser.rol === "ogretmen") {
         document.getElementById("ogretmenPanel").classList.remove("hidden");
@@ -314,8 +285,6 @@ button.action:hover {
     } else {
       document.getElementById("authScreen").classList.remove("hidden");
       document.getElementById("appScreen").classList.add("hidden");
-      document.getElementById("step1").classList.remove("hidden");
-      document.getElementById("step2").classList.add("hidden");
     }
   }
 
