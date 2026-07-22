@@ -129,16 +129,26 @@ button.action:hover {
 <div id="authScreen" class="auth-box">
   <h2 style="text-align:center; color:#185a9d; margin-top:0;">Ders & Ödev Takip</h2>
   
-  <label>E-Posta Adresin</label>
-  <input type="email" id="email" placeholder="ornek@okul.com">
+  <div id="step1">
+    <label>E-Posta Adresin</label>
+    <input type="email" id="email" placeholder="ornek@okul.com">
 
-  <label>Giriş Rolü</label>
-  <select id="rol">
-    <option value="ogrenci">Öğrenciyim</option>
-    <option value="ogretmen">Öğretmenim</option>
-  </select>
+    <label>Giriş Rolü (İlk Kayıtta Belirlenir)</label>
+    <select id="rol">
+      <option value="ogrenci">Öğrenciyim</option>
+      <option value="ogretmen">Öğretmenim</option>
+    </select>
 
-  <button class="action" onclick="girisYap()">Sisteme Giriş Yap</button>
+    <button class="action" onclick="kodGonder()">Doğrulama Kodu Gönder</button>
+  </div>
+
+  <div id="step2" class="hidden">
+    <p style="color:#565656; font-size:13px; text-align:center;">E-posta adresinize gönderilen 4 haneli doğrulama kodunu girin:</p>
+    <label>Doğrulama Kodu</label>
+    <input type="text" id="girilenKod" placeholder="Örn: 1234" maxlength="4">
+
+    <button class="action" onclick="kodAtaVeGirisYap()">Kodu Onayla ve Giriş Yap</button>
+  </div>
 </div>
 
 <!-- ANA UYGULAMA EKRANI -->
@@ -155,7 +165,7 @@ button.action:hover {
       <h3 style="color:#185a9d; margin-top:0;">👨‍🏫 Öğrenciye Ödev Gönder</h3>
       
       <label>Öğrencinin E-Postası</label>
-      <input type="text" id="hedefOgrenci" placeholder="ogrenci@okul.com">
+      <input type="email" id="hedefOgrenci" placeholder="ogrenci@okul.com">
       
       <label>Ders Adı</label>
       <input type="text" id="ovDers" placeholder="Örn: Matematik">
@@ -167,6 +177,13 @@ button.action:hover {
       <input type="date" id="ovTarih">
 
       <button class="action" onclick="odevAta()">Ödevi Gönder 🚀</button>
+
+      <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+      
+      <h3 style="color:#185a9d;">📊 Gönderdiğim Ödevlerin Durumu</h3>
+      <div id="ogretmenTakipListesi">
+        <p style="color:#666;">Yükleniyor...</p>
+      </div>
     </div>
 
     <!-- ÖĞRENCİ PANELİ -->
@@ -181,7 +198,6 @@ button.action:hover {
 </div>
 
 <script>
-  // Firebase Bağlantı Ayarın
   const firebaseConfig = {
     databaseURL: "https://ders-takip-e395b-default-rtdb.firebaseio.com"
   };
@@ -190,20 +206,72 @@ button.action:hover {
   const db = firebase.database();
 
   let currentUser = JSON.parse(localStorage.getItem("currentUser")) || null;
+  let uretilenKod = "";
+  let geciciEmail = "";
+  let geciciRol = "";
 
-  function girisYap() {
+  function epostaGecerliMi(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+
+  function kodGonder() {
     const email = document.getElementById("email").value.trim();
     const rol = document.getElementById("rol").value;
 
     if(!email) return alert("Lütfen e-posta adresini gir!");
+    if(!epostaGecerliMi(email)) return alert("Geçersiz e-posta formatı!");
+
+    const emailKey = email.replace(/\./g, '_').replace(/[@]/g, '_');
+
+    // Daha önce bu hesap açılmış mı kontrol et (Rol kilidi için)
+    db.ref('kullanicilar/' + emailKey).once('value', (snapshot) => {
+      const kayitliKullanici = snapshot.val();
+
+      if(kayitliKullanici && kayitliKullanici.rol !== rol) {
+        return alert(`Bu hesap daha önce "${kayitliKullanici.rol.toUpperCase()}" olarak kaydedilmiş! Rolü değiştiremezsiniz.`);
+      }
+
+      // 4 haneli rastgele kod üret
+      uretilenKod = Math.floor(1000 + Math.random() * 9000).toString();
+      geciciEmail = email;
+      geciciRol = rol;
+
+      // Simülasyon mail bildirimi
+      alert(`[SİMÜLASYON MAİLİ] Doğrulama Kodunuz: ${uretilenKod}`);
+
+      document.getElementById("step1").classList.add("hidden");
+      document.getElementById("step2").classList.remove("hidden");
+    });
+  }
+
+  function kodAtaVeGirisYap() {
+    const girilen = document.getElementById("girilenKod").value.trim();
+
+    if(girilen !== uretilenKod) {
+      return alert("Hatalı doğrulama kodu! Lütfen tekrar deneyin.");
+    }
+
+    const emailKey = geciciEmail.replace(/\./g, '_').replace(/[@]/g, '_');
+
+    // Rolü veritabanına sabitle
+    db.ref('kullanicilar/' + emailKey).set({
+      email: geciciEmail,
+      rol: geciciRol
+    });
 
     currentUser = { 
-      emailClean: email.replace(/\./g, '_').replace(/[@]/g, '_'), 
-      email, 
-      rol 
+      emailClean: emailKey, 
+      email: geciciEmail, 
+      rol: geciciRol 
     };
     
     localStorage.setItem("currentUser", JSON.stringify(currentUser));
+    document.getElementById("step2").classList.add("hidden");
+    document.getElementById("step1").classList.remove("hidden");
+    document.getElementById("girilenKod").value = "";
+    document.getElementById("email").value = "";
+    
     ekranKontrol();
   }
 
@@ -222,6 +290,7 @@ button.action:hover {
       if(currentUser.rol === "ogretmen") {
         document.getElementById("ogretmenPanel").classList.remove("hidden");
         document.getElementById("ogrenciPanel").classList.add("hidden");
+        ogretmenTakipGetir();
       } else {
         document.getElementById("ogretmenPanel").classList.add("hidden");
         document.getElementById("ogrenciPanel").classList.remove("hidden");
@@ -230,7 +299,6 @@ button.action:hover {
     } else {
       document.getElementById("authScreen").classList.remove("hidden");
       document.getElementById("appScreen").classList.add("hidden");
-      document.getElementById("email").value = "";
     }
   }
 
@@ -241,10 +309,10 @@ button.action:hover {
     const tarih = document.getElementById("ovTarih").value;
 
     if(!hedefEmail || !ders || !tarih) return alert("Lütfen boş alan bırakma!");
+    if(!epostaGecerliMi(hedefEmail)) return alert("Geçersiz öğrenci e-postası!");
 
     const hedefKey = hedefEmail.replace(/\./g, '_').replace(/[@]/g, '_');
 
-    // Veritabanına öğrencinin altına ödev ekleme
     db.ref('odevler/' + hedefKey).push({
       ders,
       aciklama,
@@ -254,7 +322,6 @@ button.action:hover {
     });
 
     alert("Ödev başarıyla öğrenciye iletildi!");
-    
     document.getElementById("hedefOgrenci").value = "";
     document.getElementById("ovDers").value = "";
     document.getElementById("ovAciklama").value = "";
@@ -263,11 +330,8 @@ button.action:hover {
 
   function ogrenciOdevleriniGetir() {
     const listeDiv = document.getElementById("ogrenciOdevListesi");
-    const ogrenciKey = currentUser.emailClean;
-
-    db.ref('odevler/' + ogrenciKey).on('value', (snapshot) => {
+    db.ref('odevler/' + currentUser.emailClean).on('value', (snapshot) => {
       const data = snapshot.val();
-      
       if(!data) {
         listeDiv.innerHTML = `<p style="color:#666; text-align:center;">Harika, şu an hiç ödevin yok! 🎉</p>`;
         return;
@@ -291,9 +355,45 @@ button.action:hover {
     });
   }
 
+  function ogretmenTakipGetir() {
+    const takipDiv = document.getElementById("ogretmenTakipListesi");
+    // Tüm öğrencilerin ödevlerini çekip bu öğretmenin verdiklerini filtreleyeceğiz
+    db.ref('odevler').on('value', (snapshot) => {
+      const tumVeriler = snapshot.val();
+      if(!tumVeriler) {
+        takipDiv.innerHTML = `<p style="color:#666;">Henüz kimseye ödev gönderilmedi.</p>`;
+        return;
+      }
+
+      takipDiv.innerHTML = "";
+      let toplamOdevSayisi = 0;
+
+      Object.keys(tumVeriler).forEach(ogrenciKey => {
+        const ogrenciOdevleri = tumVeriler[ogrenciKey];
+        Object.keys(ogrenciOdevleri).forEach(odevId => {
+          const o = ogrenciOdevleri[odevId];
+          if(o.ogretmen === currentUser.email) {
+            toplamOdevSayisi++;
+            const ogrenciGercekEmail = ogrenciKey.replace(/_/g, '.').replace('__', '@'); // Basit okuma
+            takipDiv.innerHTML += `
+              <div style="background:#f8f9fa; padding:10px; border-radius:10px; margin-bottom:8px; border-left:4px solid ${o.tamamlandi ? '#2ed573' : '#ff4757'}; color:#333;">
+                <b style="color:#185a9d;">Öğrenci:</b> ${ogrenciKey.replaceAll('_','.')}<br>
+                <b>Ders:</b> ${o.ders} | <b>Teslim:</b> ${o.tarih}<br>
+                <b>Durum:</b> <span style="font-weight:bold; color:${o.tamamlandi ? '#2ed573' : '#ff4757'}">${o.tamamlandi ? '✅ Tamamlandı' : '⏳ Yapılıyor'}</span>
+              </div>
+            `;
+          }
+        });
+      });
+
+      if(toplamOdevSayisi === 0) {
+        takipDiv.innerHTML = `<p style="color:#666;">Henüz hiç ödev göndermediniz.</p>`;
+      }
+    });
+  }
+
   function odevDurumDegistir(odevId, yeniDurum) {
-    const ogrenciKey = currentUser.emailClean;
-    db.ref('odevler/' + ogrenciKey + '/' + odevId).update({
+    db.ref('odevler/' + currentUser.emailClean + '/' + odevId).update({
       tamamlandi: yeniDurum
     });
   }
